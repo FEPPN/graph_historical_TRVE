@@ -7,29 +7,66 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    body{margin:0;overflow:hidden;background:#fff;font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;justify-content:center;padding:40px 16px;}
-    .chart-wrapper{background:transparent;border-radius:0;box-shadow:none;padding:0;}
-    h1{margin:0 0 14px;text-align:center;font-size:22px;font-weight:600;color:#0b0f19;}
-    .legend-note{margin:2px 0 12px;text-align:center;color:#64748b;font-size:13px;}
-    canvas{width:100% !important;height:auto !important;}
-    #myChart {
-    display:block;
-    width:100%; 
-    height:auto;
-    background:transparent !important;}
+    :root{
+      --pn-violet:#5a52ff;
+      --pn-turquoise:#0fc4b2;
+      --ink:#0b0f19;
+      --muted:#64748b;
+      --grid: rgba(0,0,0,.06);
+    }
+    html, body { margin:0; background:#fff; }
+    body{
+      font-family: 'Avenir','Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      display:flex; justify-content:center; padding:28px 14px;
+    }
+    .chart-wrapper{
+      position:relative;
+      width:100%; max-width:940px; margin:0 auto;
+      background:transparent; border-radius:0; box-shadow:none; padding:0;
+    }
+    h1{
+      margin:0 0 6px; text-align:center; font-size:22px; font-weight:600; color:var(--ink);
+      letter-spacing:.2px;
+    }
+    .legend-note{
+      margin:0 0 10px; text-align:center; color:var(--muted); font-size:13px;
+    }
+    /* Badges dernière valeur (collés à droite, au-dessus du graphe) */
+    .badges{
+      position:absolute; top:-6px; right:0; display:flex; gap:8px; align-items:center;
+      pointer-events:none;
+    }
+    .badge{
+      display:flex; align-items:center; gap:6px;
+      background: #fff; border:1px solid #e5e7eb; border-radius:999px; padding:6px 10px;
+      font-size:12px; color:var(--ink);
+      box-shadow:0 4px 14px rgba(0,0,0,.06);
+    }
+    .dot{ width:10px; height:10px; border-radius:50%; }
+    .dot.violet{ background:var(--pn-violet); }
+    .dot.turq{ background:var(--pn-turquoise); }
+    /* Canvas transparent */
+    #chart{ display:block; width:100% !important; height:auto !important; background:transparent !important; }
   </style>
 </head>
 <body>
   <div class="chart-wrapper">
-    <h1>Graph TRVE — Historique (BASE) & Prévision 2026</h1>
-    <div class="legend-note">Unités : €/kWh <strong>TTC</strong></div>
-    <canvas id="chart"></canvas>
+    <h1>TRVE — Historique (BASE) & Prévision 2026</h1>
+    <div class="legend-note">Unités : € / kWh <strong>TTC</strong></div>
+
+    <!-- Badges valeurs (remplis par JS) -->
+    <div class="badges" id="badges" aria-hidden="true" style="display:none">
+      <div class="badge" id="bBase"><span class="dot violet"></span><span>BASE</span><strong id="vBase">—</strong></div>
+      <div class="badge" id="bF"><span class="dot turq"></span><span>Forecast 2026</span><strong id="vF">—</strong></div>
+    </div>
+
+    <canvas id="chart" aria-label="Historique TRVE et prévision 2026" role="img"></canvas>
   </div>
 
   <script>
     const jsonUrl = "https://raw.githubusercontent.com/FEPPN/graph_historical_TRVE/main/data.json";
 
-    const fmtDate = iso => {
+    const fmtMonth = iso => {
       try { return new Date(iso).toLocaleDateString('fr-FR',{year:'numeric',month:'2-digit'}); }
       catch { return String(iso ?? ""); }
     };
@@ -37,25 +74,77 @@
     fetch(jsonUrl + "?v=" + Date.now(), { cache:"no-store" })
       .then(r => { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
       .then(rows => {
-        // filtre lignes valides et trie par date
+        // Filtre & tri
         const clean = rows
-          .filter(r => r.Date && (r.BASE != null || r.Forecast2026 != null))
+          .filter(r => r.Date && (typeof r.BASE === "number" || typeof r.Forecast2026 === "number"))
           .sort((a,b) => new Date(a.Date) - new Date(b.Date));
 
-        const labels   = clean.map(r => fmtDate(r.Date));
+        const labels   = clean.map(r => fmtMonth(r.Date));
         const baseVals = clean.map(r => (typeof r.BASE === "number" ? r.BASE : null));
         const f2026    = clean.map(r => (typeof r.Forecast2026 === "number" ? r.Forecast2026 : null));
 
+        // Index du premier point de prévision (pour tracer une “frontière” visuelle)
+        const firstForecastIdx = f2026.findIndex(v => typeof v === "number");
+
+        // Dernières valeurs (badges)
+        const lastBase = [...baseVals].reverse().find(v => typeof v === "number");
+        const lastF    = [...f2026].reverse().find(v => typeof v === "number");
+        if (lastBase != null || lastF != null) {
+          document.getElementById('badges').style.display = 'flex';
+          if (lastBase != null) document.getElementById('vBase').textContent = `${lastBase.toFixed(4)} €`;
+          if (lastF != null)    document.getElementById('vF').textContent    = `${lastF.toFixed(4)} €`;
+        }
+
         const ctx = document.getElementById("chart").getContext("2d");
 
-        // dégradés papernest
-        const gBase = ctx.createLinearGradient(0,0,0,300);
+        // Dégradés propres
+        const gBase = ctx.createLinearGradient(0,0,0,320);
         gBase.addColorStop(0,"rgba(90, 82, 255, 0.22)");
         gBase.addColorStop(1,"rgba(90, 82, 255, 0.00)");
 
-        const gF = ctx.createLinearGradient(0,0,0,300);
+        const gF = ctx.createLinearGradient(0,0,0,320);
         gF.addColorStop(0,"rgba(15,196,178,0.22)");
         gF.addColorStop(1,"rgba(15,196,178,0.00)");
+
+        // Plugin léger : ligne verticale “Prévisions 2026”
+        const forecastDivider = {
+          id: 'forecastDivider',
+          afterDraw(chart, args, opts) {
+            if (firstForecastIdx <= 0) return;
+            const {ctx, chartArea, scales:{x,y}} = chart;
+            const xPos = x.getPixelForTick(firstForecastIdx);
+            ctx.save();
+            ctx.setLineDash([4,4]);
+            ctx.strokeStyle = 'rgba(0,0,0,.25)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(xPos, chartArea.top);
+            ctx.lineTo(xPos, chartArea.bottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            // Label
+            ctx.fillStyle = '#334155';
+            ctx.font = '600 12px Inter, system-ui, -apple-system, Segoe UI, sans-serif';
+            const text = 'Prévisions 2026';
+            const pad = 6;
+            const tw = ctx.measureText(text).width + pad*2;
+            const th = 20;
+            const tx = Math.min(xPos + 8, chartArea.right - tw);
+            const ty = chartArea.top + 8;
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = 'rgba(0,0,0,.08)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            const r = 8;
+            // pill blanche
+            ctx.roundRect(tx, ty, tw, th, r);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#0b0f19';
+            ctx.fillText(text, tx + pad, ty + 14);
+            ctx.restore();
+          }
+        };
 
         new Chart(ctx, {
           type: 'line',
@@ -65,9 +154,9 @@
               {
                 label: "BASE (historique)",
                 data: baseVals,
-                borderColor: "#5a52ff",
+                borderColor: getComputedStyle(document.documentElement).getPropertyValue('--pn-violet').trim() || "#5a52ff",
                 backgroundColor: gBase,
-                borderWidth: 1.6,
+                borderWidth: 1.4,
                 pointRadius: 0,
                 spanGaps: true,
                 tension: 0.28,
@@ -76,9 +165,9 @@
               {
                 label: "Forecast 2026",
                 data: f2026,
-                borderColor: "#0fc4b2",
+                borderColor: getComputedStyle(document.documentElement).getPropertyValue('--pn-turquoise').trim() || "#0fc4b2",
                 backgroundColor: gF,
-                borderWidth: 1.6,
+                borderWidth: 1.4,
                 borderDash: [5,4],
                 pointRadius: 0,
                 spanGaps: true,
@@ -89,6 +178,7 @@
           },
           options: {
             responsive: true,
+            maintainAspectRatio: true,
             interaction: { mode: 'nearest', intersect: false },
             plugins: {
               legend: {
@@ -101,6 +191,7 @@
                 titleFont:{ weight:'700' }, bodyFont:{ weight:'500' },
                 padding:10, cornerRadius:10,
                 callbacks: {
+                  // TTC explicite
                   label: (ctx) => `${ctx.dataset.label} : ${ctx.parsed.y?.toFixed(4)} € / kWh TTC`
                 }
               }
@@ -108,7 +199,7 @@
             scales: {
               y: {
                 ticks: { color:"#6b7280", callback: v => `${Number(v).toFixed(3)} €` },
-                grid: { color:"rgba(0,0,0,0.06)" },
+                grid: { color:"var(--grid)" },
                 border: { display:false }
               },
               x: {
@@ -117,7 +208,8 @@
                 border: { display:false }
               }
             }
-          }
+          },
+          plugins: [forecastDivider]
         });
       })
       .catch(err => {
@@ -130,3 +222,4 @@
   </script>
 </body>
 </html>
+
