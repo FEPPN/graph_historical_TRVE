@@ -44,7 +44,7 @@
           
 
         const labels   = clean.map(r => fmtDate(r.Date));
-        const baseVals = clean.map(r => (typeof r.AVG === "number" ? r.BASE : null));
+        const baseVals = clean.map(r => (typeof r.AVG === "number" ? r.AVG : null));
         const f2026    = clean.map(r => (typeof r.Forecast2026 === "number" ? r.Forecast2026 : null));
 
         const ctx = document.getElementById("chart").getContext("2d");
