@@ -39,11 +39,12 @@
       .then(rows => {
         // filtre lignes valides et trie par date
         const clean = rows
-          .filter(r => r.Date && (r.BASE != null || r.Forecast2026 != null))
+          .filter(r => r.Date && (r.AVG != null || r.Forecast2026 != null))
           .sort((a,b) => new Date(a.Date) - new Date(b.Date));
+          
 
         const labels   = clean.map(r => fmtDate(r.Date));
-        const baseVals = clean.map(r => (typeof r.BASE === "number" ? r.BASE : null));
+        const baseVals = clean.map(r => (typeof r.AVG === "number" ? r.BASE : null));
         const f2026    = clean.map(r => (typeof r.Forecast2026 === "number" ? r.Forecast2026 : null));
 
         const ctx = document.getElementById("chart").getContext("2d");
