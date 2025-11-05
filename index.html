@@ -7,16 +7,42 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    body{margin:0;overflow:hidden;background:#fff;font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;justify-content:center;padding:40px 16px;}
-    .chart-wrapper{background:transparent;border-radius:0;box-shadow:none;padding:0;}
-    h1{margin:0 0 14px;text-align:center;font-size:22px;font-weight:600;color:#0b0f19;}
-    .legend-note{margin:2px 0 12px;text-align:center;color:#64748b;font-size:13px;}
-    canvas{width:100% !important;height:auto !important;}
-    #myChart {
-    display:block;
-    width:100%; 
-    height:auto;
-    background:transparent !important;}
+    body{
+      margin:0;
+      overflow:hidden;
+      background:#fff;
+      font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      display:flex;
+      justify-content:center;
+      padding:40px 16px 60px; /* ✅ ajout padding bas pour légende */
+    }
+    .chart-wrapper{
+      background:transparent;
+      border-radius:0;
+      box-shadow:none;
+      padding:0;
+      width:100%;
+      max-width:940px;
+    }
+    h1{
+      margin:0 0 14px;
+      text-align:center;
+      font-size:22px;
+      font-weight:600;
+      color:#0b0f19;
+    }
+    .legend-note{
+      margin:2px 0 12px;
+      text-align:center;
+      color:#64748b;
+      font-size:13px;
+    }
+    canvas{
+      width:100%!important;
+      height:auto!important;
+      display:block;
+      background:transparent!important;
+    }
   </style>
 </head>
 <body>
@@ -28,13 +54,12 @@
 
   <script>
     const jsonUrl = "https://raw.githubusercontent.com/FEPPN/graph_historical_TRVE/main/data.json";
+
     const d = new Date();
-d.setDate(d.getDate() - 1);
-const yesterday = d.toLocaleDateString('fr-FR', {
-  day: '2-digit',
-  month: 'long',
-  year: 'numeric'
-});
+    d.setDate(d.getDate() - 1);
+    const yesterday = d.toLocaleDateString('fr-FR', {
+      day: '2-digit', month: 'long', year: 'numeric'
+    });
 
     const fmtDate = iso => {
       try { return new Date(iso).toLocaleDateString('fr-FR',{year:'numeric',month:'2-digit'}); }
@@ -44,11 +69,9 @@ const yesterday = d.toLocaleDateString('fr-FR', {
     fetch(jsonUrl + "?v=" + Date.now(), { cache:"no-store" })
       .then(r => { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
       .then(rows => {
-        // filtre lignes valides et trie par date
         const clean = rows
           .filter(r => r.Date && (r.AVG != null || r.Forecast2026 != null))
           .sort((a,b) => new Date(a.Date) - new Date(b.Date));
-          
 
         const labels   = clean.map(r => fmtDate(r.Date));
         const baseVals = clean.map(r => (typeof r.AVG === "number" ? r.AVG : null));
@@ -56,7 +79,6 @@ const yesterday = d.toLocaleDateString('fr-FR', {
 
         const ctx = document.getElementById("chart").getContext("2d");
 
-        // dégradés papernest
         const gBase = ctx.createLinearGradient(0,0,0,300);
         gBase.addColorStop(0,"rgba(90, 82, 255, 0.22)");
         gBase.addColorStop(1,"rgba(90, 82, 255, 0.00)");
@@ -64,8 +86,6 @@ const yesterday = d.toLocaleDateString('fr-FR', {
         const gF = ctx.createLinearGradient(0,0,0,300);
         gF.addColorStop(0,"rgba(15,196,178,0.22)");
         gF.addColorStop(1,"rgba(15,196,178,0.00)");
-
-        
 
         new Chart(ctx, {
           type: 'line',
@@ -132,6 +152,12 @@ const yesterday = d.toLocaleDateString('fr-FR', {
             }
           }
         });
+
+        // ✅ recalcul hauteur après rendu complet
+        setTimeout(() => {
+          const h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+          parent.postMessage({ type: 'resize-iframe', height: h + 20 }, '*');
+        }, 400);
       })
       .catch(err => {
         console.error(err);
@@ -141,7 +167,5 @@ const yesterday = d.toLocaleDateString('fr-FR', {
         );
       });
   </script>
-
-
 </body>
 </html>
