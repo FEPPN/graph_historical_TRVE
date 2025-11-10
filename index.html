@@ -86,6 +86,16 @@
         const gF = ctx.createLinearGradient(0,0,0,300);
         gF.addColorStop(0,"rgba(15,196,178,0.22)");
         gF.addColorStop(1,"rgba(15,196,178,0.00)");
+        // Dernier index où la prédiction existe
+const lastPredIndex = (() => {
+  for (let i = f2026.length - 1; i >= 0; i--) {
+    if (f2026[i] != null) return i;
+  }
+  return -1;
+})();
+
+
+        
 
         new Chart(ctx, {
           type: 'line',
@@ -128,30 +138,29 @@
                 labels: { color: "#1f2937", font: { size: 13, weight: "600" } }
               },
               tooltip: {
-  backgroundColor:"#fff", borderColor:"#e5e7eb", borderWidth:1,
-  titleColor:"#111827", bodyColor:"#4b5563",
-  titleFont:{ weight:'700' }, bodyFont:{ weight:'500' },
-  padding:10, cornerRadius:10,
+    backgroundColor:"#fff", borderColor:"#e5e7eb", borderWidth:1,
+    titleColor:"#111827", bodyColor:"#4b5563",
+    titleFont:{ weight:'700' }, bodyFont:{ weight:'500' },
+    padding:10, cornerRadius:10,
 
-  // ✅ 1) On n'inclut la "Prédiction" que pour son DERNIER point
-  filter: (item) => {
-    const ds = item.chart.data.datasets[item.datasetIndex];
-    if (ds.label.startsWith("Prédiction")) {
-      const lastIndex = ds.data.map(v => v != null).lastIndexOf(true);
-      return item.dataIndex === lastIndex; // garde uniquement le dernier (févr. 2026)
-    }
-    return true; // toujours afficher l'historique
-  },
-
-  // ✅ 2) Libellés clairs
-  callbacks: {
-    label: (ctx) => {
-      const val = ctx.parsed.y?.toFixed(4);
-      if (ctx.dataset.label.startsWith("Tarif Bleu")) {
-        return `Tarif Bleu (historique) : ${val} € / kWh TTC`;
+    // ✅ n’affiche la prédiction que sur son dernier point
+    filter: (item) => {
+      // datasetIndex === 1  → ton dataset "Prédiction"
+      if (item.datasetIndex === 1) {
+        return item.dataIndex === lastPredIndex;
       }
-      // Ici, on n'arrive que sur le dernier point de la prédiction
-      return `${ctx.dataset.label} : ${val} € / kWh TTC`;
+      return true; // toujours afficher l’historique
+    },
+
+    callbacks: {
+      label: (ctx) => {
+        const val = ctx.parsed.y?.toFixed(4);
+        if (ctx.datasetIndex === 0) {
+          return `Tarif Bleu (historique) : ${val} € / kWh TTC`;
+        }
+        // Ici on est sur le dernier point de la prédiction
+        return `${ctx.dataset.label} : ${val} € / kWh TTC`;
+      }
     }
   }
 },
